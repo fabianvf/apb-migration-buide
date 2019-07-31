@@ -68,6 +68,27 @@ For example, if you have a resource with `kind: Memcached`, the kind of your new
 
 The playbook for this entry should map to your `bind` playbook, (likely location `/opt/ansible/playbooks/bind.yml`), and if you have an `unbind` playbook then set the playbook for the finalizer to point to it (likely location `/opt/ansible/playbooks/unbind.yml`). If you don't have an `unbind` playbook, remove the finalizer block for your `Binding` resource.
 
+For an APB with both `bind` and `unbind` playbooks, the `watches.yaml` would end up looking like this:
+
+```yaml
+---
+- version: v1alpha1
+  group: apps.example.com
+  kind: Memcached
+  playbook: /opt/ansible/playbooks/provision.yml
+  finalizer:
+    name: finalizer.memcached.apps.example.com/v1alpha1
+    playbook: /opt/ansible/playbooks/deprovision.yml
+- version: v1alpha1
+  group: apps.example.com
+  kind: MemcachedBinding
+  playbook: /opt/ansible/playbooks/bind.yml
+  finalizer:
+    name: finalizer.memcachedbinding.apps.example.com/v1alpha1
+    playbook: /opt/ansible/playbooks/unbind.yml
+```
+
+
 You will also need to run `operator-sdk add crd --api-version=<group>/<version> --kind=<kind>` to generate a new CRD and example in `deploy/crds`.
 
 #### deploy/crds/
@@ -164,17 +185,10 @@ would become:
 * The `k8s` module was added in Ansible 2.6 and is the supported way to interact with Kubernetes from Ansible.
 * The `k8s` module takes normal kubernetes manifests, so if you currently rely on the old generated modules some refactoring will be required.
 
-## apb.yml
-* Pieces of the apb.yml will move to the Custom Resource Definition
-* No concept of plans with operators, will need to merge configuration into single CRD
-
 ## Bindings
 * Operators have no concept of a binding
 * Can be represented as a secondary Custom Resource
 * Store the (or point to secret containing) results in the status of the <APP>Binding resource
-
-### asb_encode_binding
-* Rather than writing out your credentials here, you will instead create a secret that contains them, and then use the `k8s_status` module to add a reference to that secret to the status of your CR.
 
 ## Example watches.yaml
 
