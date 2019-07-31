@@ -1,56 +1,5 @@
 # Migrating an APB to an Ansible Operator
 
-* Playbooks and roles shouldn't need to change much
-* provision.yml -> the playbook specified in watches.yaml
-* deprovision.yml -> the finalizer playbook specified in watches.yaml
-
-## ansible_kubernetes_modules
-* The ansible_kubernetes_modules role and the generated modules are now deprecated.
-* The `k8s` module was added in Ansible 2.6 and is the supported way to interact with Kubernetes from Ansible.
-* The `k8s` module takes normal kubernetes manifests, so if you currently rely on the old generated modules some refactoring will be required.
-
-## apb.yml
-* Pieces of the apb.yml will move to the Custom Resource Definition
-* No concept of plans with operators, will need to merge configuration into single CRD
-
-## Bindings
-* Operators have no concept of a binding
-* Can be represented as a secondary Custom Resource
-* Store the (or point to secret containing) results in the status of the <APP>Binding resource
-
-### asb_encode_binding
-* Rather than writing out your credentials here, you will instead create a secret that contains them, and then use the `k8s_status` module to add a reference to that secret to the status of your CR.
-
-## Example watches.yaml
-
-```
----
-- version: v1alpha1
-  group: apps.keycloak.org
-  kind: Keycloak
-  playbook: /opt/ansible/playbooks/provision.yml
-  finalizer:
-    name: finalizer.apps.keycloak.org/v1alpha1
-    playbook: /opt/ansible/playbooks/deprovision.yml
-
-- version: v1alpha1
-  group: apps.keycloak.org
-  kind: KeycloakBinding
-  playbook: /opt/ansible/playbooks/bind.yml
-  finalizer:
-    name: finalizer.apps.keycloak.org/v1alpha1
-    playbook: /opt/ansible/playbooks/unbind.yml
-```
-
-## Terms
-kind
-group
-apiVersion
-watches.yaml
-finalizer
-CRD
-
-
 ## Basic process
 ### Directory structure and metadata
 1. Generate an operator with operator-sdk new <name> --type=ansible --api-version=<group>/<version> --kind=<kind>
@@ -116,3 +65,57 @@ would become:
     status:
       bind_credentials_secret: '{{ meta.name }}-credentials'
 ```
+
+
+# scratch
+* Playbooks and roles shouldn't need to change much
+* provision.yml -> the playbook specified in watches.yaml
+* deprovision.yml -> the finalizer playbook specified in watches.yaml
+
+## ansible_kubernetes_modules
+* The ansible_kubernetes_modules role and the generated modules are now deprecated.
+* The `k8s` module was added in Ansible 2.6 and is the supported way to interact with Kubernetes from Ansible.
+* The `k8s` module takes normal kubernetes manifests, so if you currently rely on the old generated modules some refactoring will be required.
+
+## apb.yml
+* Pieces of the apb.yml will move to the Custom Resource Definition
+* No concept of plans with operators, will need to merge configuration into single CRD
+
+## Bindings
+* Operators have no concept of a binding
+* Can be represented as a secondary Custom Resource
+* Store the (or point to secret containing) results in the status of the <APP>Binding resource
+
+### asb_encode_binding
+* Rather than writing out your credentials here, you will instead create a secret that contains them, and then use the `k8s_status` module to add a reference to that secret to the status of your CR.
+
+## Example watches.yaml
+
+```
+---
+- version: v1alpha1
+  group: apps.keycloak.org
+  kind: Keycloak
+  playbook: /opt/ansible/playbooks/provision.yml
+  finalizer:
+    name: finalizer.apps.keycloak.org/v1alpha1
+    playbook: /opt/ansible/playbooks/deprovision.yml
+
+- version: v1alpha1
+  group: apps.keycloak.org
+  kind: KeycloakBinding
+  playbook: /opt/ansible/playbooks/bind.yml
+  finalizer:
+    name: finalizer.apps.keycloak.org/v1alpha1
+    playbook: /opt/ansible/playbooks/unbind.yml
+```
+
+## Terms
+kind
+group
+apiVersion
+watches.yaml
+finalizer
+CRD
+
+
