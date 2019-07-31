@@ -9,15 +9,15 @@ operator-sdk new <name> --type=ansible --api-version=<group>/<version> --kind=<k
 ```
 where:
 
-* `<name>` is the name for your operator, so if for example you have a `redis-apb`, you would probably use `redis-operator`
+* `<name>` is the name for your operator, so if for example you have a `memcached-apb`, you would probably use `memcached-operator`
 * `<group>` is the API group for your Kubernetes Custom Resource Definition. For example, if I own the domain `example.com`, I might use the group `apps.example.com`.
 * `<version>` is the API version for your Kubernete Custom Resource Definition. `v1alpha1` is a common starting value, with `v1beta1` implying a fair amount of API stability and `v1` implying no breaking API changes at all.
-* `<kind>` is the kind of your resource. For example, if you are creating a `redis-operator`, your `kind` would likely be `Redis`
+* `<kind>` is the kind of your resource. For example, if you are creating a `memcached-operator`, your `kind` would likely be `Memcached`
 
-So for the example `redis-operator`, the command would be:
+So for the example `memcached-operator`, the command would be:
 
 ```
-operator-sdk new redis-operator --type=ansible --api-version=apps.example.com/v1alpha1 --kind=Redis
+operator-sdk new memcached-operator --type=ansible --api-version=apps.example.com/v1alpha1 --kind=Memcached
 ```
 
 
@@ -30,21 +30,43 @@ In your `build/Dockerfile`, ensure that your playbooks and roles are being copie
 
 If you are installing any additional dependencies, ensure that those are reflected in your `build/Dockerfile` as well. 
 
-You may now remove your original APB `Dockerfile`.
+As a sample, your `build/Dockerfile` will probably look something like this:
+
+```
+FROM quay.io/operator-framework/ansible-operator:v0.9.0
+
+COPY watches.yaml ${HOME}/watches.yaml
+
+COPY roles/ ${HOME}/roles/
+COPY playbooks/ ${HOME}/playbooks/
+```
+
+Once this is done you may remove your original APB `Dockerfile`.
 
 #### watches.yaml
 In the `watches.yaml`, ensure the playbook for your `kind` points to your `provision.yml` playbook in the container (likely location for that will be `/opt/ansible/playbooks/provision.yml`). 
 
-Next, add a finalizer block with a name of: `<name>.<group>/<version>`, and set the playbook to point to your `deprovision.yml` in the container (likely location for that will be `/opt/ansible/playbooks/deprovision.yml`).
+Next, add a finalizer block with a name of: `finalizer.<name>.<group>/<version>`, and set the playbook to point to your `deprovision.yml` in the container (likely location for that will be `/opt/ansible/playbooks/deprovision.yml`). For the memcached-operator we generated above, the watches.yaml would look like this:
+
+```yaml
+---
+- version: v1alpha1
+  group: apps.example.com
+  kind: Memcached
+  playbook: /opt/ansible/playbooks/provision.yml
+  finalizer:
+    name: finalizer.memcached.apps.example.com/v1alpha1
+    playbook: /opt/ansible/playbooks/deprovision.yml
+```
 
 ##### Binding
-If you have a `bind` playbook, add a new entry to your `watches.yaml` (you can copy paste the first one). 
+If you have a `bind` playbook, add a new entry to your `watches.yaml` (you can copy paste the existing entry). 
 
 The `version` and `group`, will remain unchanged, but update the `kind` with a `Binding` suffix. 
 
-For example, if you have a resource with `kind: Keycloak`, the kind of your new entry will be `KeycloakBinding`. 
+For example, if you have a resource with `kind: Memcached`, the kind of your new entry will be `MemcachedBinding`. 
 
-The playbook for this entry should map to your `bind` playbook, (likely location `/opt/ansible/playbooks/bind.yml`), and if you have an `unbind` playbook then set the playbook for the finalizer to point to it (likely location `/opt/ansible/playbooks/unbind.yml`). 
+The playbook for this entry should map to your `bind` playbook, (likely location `/opt/ansible/playbooks/bind.yml`), and if you have an `unbind` playbook then set the playbook for the finalizer to point to it (likely location `/opt/ansible/playbooks/unbind.yml`). If you don't have an `unbind` playbook, remove the finalizer block for your `Binding` resource.
 
 You will also need to run `operator-sdk add crd --api-version=<group>/<version> --kind=<kind>` to generate a new CRD and example in `deploy/crds`.
 
@@ -58,8 +80,29 @@ You may notice that the OpenAPI validation uses `camelCase` parameters, while yo
 ### Ansible logic
 There will be some changes required to your Ansible playbooks/roles/tasks.
 
+#### Idempotence
+
+One major conceptual difference between the APB model and the Operator model, is that APBs are meant to run `provision` once, while operators constantly reconcile to ensure that the state of the cluster matches the state that the user requested. 
+
+This means that you will need to ensure that your playbooks are idempotent, and can be run repeatedly with the same parameters without causing an error.
+
+#### Service Bundle contract and meta variables
+Ansible Operator does not respect the Service Bundle contract that exists between APBs and the Ansible Service Broker. The following variables will not be passed in by the Ansible Operator:
+
+- `cluster`: Operators ideally work on both Kubernetes and OpenShift, so any uses of openshift-specific resources should handle errors and fallback
+- `_apb_plan_id`: Operators have no concept of a plan
+- `_apb_service_class_id`: This concept is replaced by the group/version/kind specified in your CRD
+- `_apb_service_instance_id`: This concept is replaced by `meta.name`, the name of the Custom Resource created by the user requesting the action.
+- `_apb_last_requesting_user`: There is no analogue to this.
+- `_apb_provision_creds`: There is no analogue to this
+- `_apb_service_binding_id`: This concept is replaced by the `meta.name` of a `<kind>Binding` resource
+- `namespace`
+
+Instead, the Ansible Operator will pass in a field called `meta`, which contains the `name` and `namespace` of the Custom Resource that the user created.
+
+
 #### asb_encode_binding
-This module will not be present in the Ansible Operator base image. In order to save credentials after a successful provision, you will need to create a `secret` in Kubernetes, and update the status of your custom resource so that people can find it. For example, if we have the following Custom Resource:
+This module will not be present in the Ansible Operator base image. In order to save credentials after a successful provision, you will need to create a `secret` in Kubernetes, and update the status of your custom resource so that people can find it. For example, if we have the following Custom Resource group/version/kind:
 
 ```yaml
 version: v1alpha1
