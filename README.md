@@ -174,49 +174,16 @@ would become:
       bind_credentials_secret: '{{ meta.name }}-credentials'
 ```
 
-
-# scratch
-* Playbooks and roles shouldn't need to change much
-* provision.yml -> the playbook specified in watches.yaml
-* deprovision.yml -> the finalizer playbook specified in watches.yaml
-
-## ansible_kubernetes_modules
+#### ansible_kubernetes_modules
 * The ansible_kubernetes_modules role and the generated modules are now deprecated.
 * The `k8s` module was added in Ansible 2.6 and is the supported way to interact with Kubernetes from Ansible.
 * The `k8s` module takes normal kubernetes manifests, so if you currently rely on the old generated modules some refactoring will be required.
 
-## Bindings
-* Operators have no concept of a binding
-* Can be represented as a secondary Custom Resource
-* Store the (or point to secret containing) results in the status of the <APP>Binding resource
 
-## Example watches.yaml
-
-```
----
-- version: v1alpha1
-  group: apps.keycloak.org
-  kind: Keycloak
-  playbook: /opt/ansible/playbooks/provision.yml
-  finalizer:
-    name: finalizer.apps.keycloak.org/v1alpha1
-    playbook: /opt/ansible/playbooks/deprovision.yml
-
-- version: v1alpha1
-  group: apps.keycloak.org
-  kind: KeycloakBinding
-  playbook: /opt/ansible/playbooks/bind.yml
-  finalizer:
-    name: finalizer.apps.keycloak.org/v1alpha1
-    playbook: /opt/ansible/playbooks/unbind.yml
-```
-
-## Terms
+# Terms
 kind
 group
 apiVersion
 watches.yaml
 finalizer
 CRD
-
-
