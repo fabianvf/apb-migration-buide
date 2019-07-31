@@ -3,17 +3,34 @@
 ## Basic process
 ### Directory structure and metadata
 #### Generate Operator resources
-1. Generate an operator with `operator-sdk new <name> --type=ansible --api-version=<group>/<version> --kind=<kind>`
-1. Take the `build`, `deploy`, and `molecule` directories, as well as the `watches.yaml` and copy them into your APB directory
+Generate an operator with
+```
+operator-sdk new <name> --type=ansible --api-version=<group>/<version> --kind=<kind>`
+```
+where:
+
+* `<name>` is the name for your operator, so if for example you have a `redis-apb`, you would probably use `redis-operator`
+* `<group>` is the API group for your Kubernetes Custom Resource Definition. For example, if I own the domain `example.com`, I might use the group `apps.example.com`.
+* `<version>` is the API version for your Kubernete Custom Resource Definition. `v1alpha1` is a common starting value, with `v1beta1` implying a fair amount of API stability and `v1` implying no breaking API changes at all.
+* `<kind>` is the kind of your resource. For example, if you are creating a `redis-operator`, your `kind` would likely be `Redis`
+
+So for the example `redis-operator`, the command would be:
+
+```
+operator-sdk new redis-operator --type=ansible --api-version=apps.example.com/v1alpha1 --kind=Redis
+```
+
+
+Once this is generated, take the `build`, `deploy`, and `molecule` directories, as well as the `watches.yaml` and copy them into your APB directory.
 
 #### Dockerfile
-You now have two Dockerfiles, your original `apb` `Dockerfile` at the top-level, and a `build/Dockerfile` for your operator. 
+You now have two Dockerfiles, your original APB `Dockerfile` at the top-level, and a `build/Dockerfile` for your operator. 
 
 In your `build/Dockerfile`, ensure that your playbooks and roles are being copied to `${HOME}/roles` and `${HOME}/playbooks`, and that your `watches.yaml` is being copied to `${HOME}/watches.yaml`. 
 
 If you are installing any additional dependencies, ensure that those are reflected in your `build/Dockerfile` as well. 
 
-You may now remove your original `apb` Dockerfile.
+You may now remove your original APB `Dockerfile`.
 
 #### watches.yaml
 In the `watches.yaml`, ensure the playbook for your `kind` points to your `provision.yml` playbook in the container (likely location for that will be `/opt/ansible/playbooks/provision.yml`). 
