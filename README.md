@@ -94,9 +94,9 @@ Ansible Operator does not respect the Service Bundle contract that exists betwee
 - `_apb_service_class_id`: This concept is replaced by the group/version/kind specified in your CRD
 - `_apb_service_instance_id`: This concept is replaced by `meta.name`, the name of the Custom Resource created by the user requesting the action.
 - `_apb_last_requesting_user`: There is no analogue to this.
-- `_apb_provision_creds`: There is no analogue to this
+- `_apb_provision_creds`: There is no analogue to this.
 - `_apb_service_binding_id`: This concept is replaced by the `meta.name` of a `<kind>Binding` resource
-- `namespace`
+- `namespace`: This is accessible via the `meta.namespace` variable
 
 Instead, the Ansible Operator will pass in a field called `meta`, which contains the `name` and `namespace` of the Custom Resource that the user created.
 
