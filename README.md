@@ -66,4 +66,53 @@ CRD
 There will be some changes required to your Ansible playbooks/roles/tasks.
 
 #### asb_encode_binding
-This module will not be present in the Ansible Operator base image. In order to save credentials after a successful provision, you will need to create a `secret`
+This module will not be present in the Ansible Operator base image. In order to save credentials after a successful provision, you will need to create a `secret` in Kubernetes, and update the status of your custom resource so that people can find it. For example, if we have the following Custom Resource:
+
+```yaml
+version: v1alpha1
+group: apps.example.com
+kind: PostgreSQL
+```
+
+the following task:
+
+```yaml
+- name: encode bind credentials
+  asb_encode_binding:
+    fields:
+      DB_TYPE: postgres
+      DB_HOST: "{{ app_name }}"
+      DB_PORT: "5432"
+      DB_USER: "{{ postgresql_user }}"
+      DB_PASSWORD: "{{ postgresql_password }}"
+      DB_NAME: "{{ postgresql_database }}"
+```
+
+would become:
+
+```yaml
+- name: Create bind credential secret
+  k8s:
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: '{{ meta.name }}-credentials'
+        namespace: '{{ meta.namespace }}'
+      data:
+        DB_TYPE: "{{ 'postgres' | b64encode }}"
+        DB_HOST: "{{ app_name | b64encode }}"
+        DB_PORT: "{{ '5432' | b64encode }}"
+        DB_USER: "{{ postgresql_user | b64encode }}"
+        DB_PASSWORD: "{{ postgresql_password | b64encode }}"
+        DB_NAME: "{{ postgresql_database | b64encode }}"
+
+- name: Attach secret to CR status
+  k8s_status:
+    api_version: apps.example.com/v1alpha1
+    kind: PostgreSQL
+    name: '{{ meta.name }}'
+    namespace: '{{ meta.namespace }}'
+    status:
+      bind_credentials_secret: '{{ meta.name }}-credentials'
+```
